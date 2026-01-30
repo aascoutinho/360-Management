@@ -3,10 +3,12 @@ import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { RDOModule } from './components/RDOModule';
 import { IndexManager } from './components/IndexManager';
-
-// Placeholder components for sections not fully detailed in this sprint
-const Construction = () => <div className="p-8 text-gray-500 text-center">Módulo em Desenvolvimento: Cadastro de Obras</div>;
-const Equipment = () => <div className="p-8 text-gray-500 text-center">Módulo em Desenvolvimento: Gestão de Ativos e Custos</div>;
+import { ProjectManager } from './components/ProjectManager';
+import { AssetManager } from './components/AssetManager';
+import { CostManager } from './components/CostManager';
+import { PlanningModule } from './components/PlanningModule';
+import { AnalyticsModule } from './components/AnalyticsModule';
+import { MeasurementModule } from './components/MeasurementModule';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState('dashboard');
@@ -14,10 +16,14 @@ const App: React.FC = () => {
   const renderView = () => {
     switch(currentView) {
       case 'dashboard': return <Dashboard />;
+      case 'planning': return <PlanningModule />;
+      case 'analytics': return <AnalyticsModule />;
+      case 'measurement': return <MeasurementModule />;
       case 'rdo': return <RDOModule />;
       case 'indices': return <IndexManager />;
-      case 'projects': return <Construction />;
-      case 'equipment': return <Equipment />;
+      case 'projects': return <ProjectManager />;
+      case 'assets': return <AssetManager />;
+      case 'costs': return <CostManager />;
       default: return <Dashboard />;
     }
   };

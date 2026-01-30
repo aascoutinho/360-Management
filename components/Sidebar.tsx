@@ -2,10 +2,13 @@ import React from 'react';
 import { 
   LayoutDashboard, 
   FileText, 
-  HardHat, 
   Truck, 
   TrendingUp, 
-  Building2 
+  Building2,
+  DollarSign,
+  CalendarRange,
+  PieChart,
+  FileSpreadsheet
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -16,10 +19,14 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'planning', label: 'Planejamento', icon: CalendarRange },
+    { id: 'measurement', label: 'Boletim Medição', icon: FileSpreadsheet }, // New Item
+    { id: 'analytics', label: 'Analytics', icon: PieChart },
     { id: 'rdo', label: 'Lançamento RDO', icon: FileText },
     { id: 'projects', label: 'Obras & Contratos', icon: Building2 },
     { id: 'indices', label: 'Índices & Revisões', icon: TrendingUp },
-    { id: 'equipment', label: 'Ativos & Custos', icon: Truck },
+    { id: 'assets', label: 'Frota / Ativos', icon: Truck },
+    { id: 'costs', label: 'Custos de Equip.', icon: DollarSign },
   ];
 
   return (
