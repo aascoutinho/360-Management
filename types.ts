@@ -164,14 +164,27 @@ export interface MeasurementItem {
   description: string;
   unit: string;
   unitPrice: number;
-  measuredQuantity: number; // 'Qtd. DO MÊS'
-  measuredValue: number;    // Calculated or 'Valor R$ DO MÊS'
+  
+  // Quantities
+  plannedQuantity: number;      // Col H: Qtd. TOTAL PREVISTO
+  accumulatedPreviousQty: number; // Col I: Qtd. ACUMULADO ANTERIOR
+  measuredQuantity: number;     // Col J: Qtd. DO MÊS
+  totalAccumulatedQty: number;  // Col K: Qtd. TOTAL ACUMULADO
+
+  // Values
+  accumulatedPreviousValue: number; // Col L: Valor R$ ACUMULADO ANTERIOR
+  measuredValue: number;            // Col M: Valor R$ DO MÊS
+  totalAccumulatedValue: number;    // Col N: Valor R$ TOTAL ACUMULADO
+  totalContractValue: number;       // Col O: Valor R$ PREVISTO CONTRATO
+  balanceValue: number;             // Col P: Valor R$ SALDO
+  executionPercentage: number;      // Col Q: EXEC.%
 }
 
 export interface MeasurementBulletin {
   id: string;
   projectId: string;
-  referenceDate: string; // The "Data de Referência"
+  referenceDate: string; // The "Data de Referência" (Month/Year sorting)
+  measurementPeriod: string; // The specific period text (e.g. "21/09 a 20/10")
   type: IndexType; // Rental or Construtora
   items: MeasurementItem[];
   totalValue: number;
@@ -179,37 +192,32 @@ export interface MeasurementBulletin {
   fileName: string;
 }
 
+// Helper Interface for Financial Splits
+export interface FinancialSplit {
+  total: number;
+  rental: number;
+  construction: number;
+}
+
 export interface DashboardMetrics {
-  totalRevenue: number;
-  rentalRevenue: number;
-  constructionRevenue: number;
-  totalCosts: number;
+  // Card 1: Valor Total Contrato (Col O)
+  contractTotal: FinancialSplit;
   
-  // Detailed Breakdowns
-  equipmentHealth: {
-    equipmentId: string; // ID
-    equipmentName: string; // Name for display
-    category: string;
-    revenue: number;
-    cost: number;
-    margin: number;
-  }[];
+  // Card 2: Valor Total Medido Acumulado (Col N)
+  measuredTotal: FinancialSplit;
 
-  categoryMetrics: {
-    name: string;
-    revenue: number;
-    cost: number;
-    margin: number;
-  }[];
+  // Card 3: Saldo Total (Col P)
+  balanceTotal: FinancialSplit;
 
-  cityMetrics: {
-    name: string;
-    value: number;
-  }[];
+  // Card 4: Média Mensal (Sum of Col M / Count)
+  monthlyAverage: FinancialSplit;
 
-  segmentMetrics: {
-    name: string;
-    value: number;
+  // Chart Data
+  evolutionHistory: {
+    month: string; // YYYY-MM
+    measuredMonthly: number; // Bar: Col M
+    balance: number; // Line: Col P (Snapshot at that month)
+    accumulated: number; // Line: Col N
   }[];
 }
 

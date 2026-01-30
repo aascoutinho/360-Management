@@ -1,6 +1,6 @@
 import { 
   Project, ContractIndex, Equipment, RDO, IndexType, EquipmentOwner, 
-  CostType, EquipmentCost, RDOItem, DashboardMetrics, IndexRevision, ProjectSegment, MeasurementType, Company, MonthlyPlan, AnalyticsSummary, ItemAnalytics, FleetAnalytics, MeasurementBulletin
+  CostType, EquipmentCost, RDOItem, DashboardMetrics, IndexRevision, ProjectSegment, MeasurementType, Company, MonthlyPlan, AnalyticsSummary, ItemAnalytics, FleetAnalytics, MeasurementBulletin, FinancialSplit
 } from '../types';
 
 // --- MOCK DATA SEED ---
@@ -324,6 +324,16 @@ export const DataService = {
     BULLETINS.push(bulletin);
   },
 
+  updateBulletin: async (id: string, date: string, period: string, type: IndexType): Promise<void> => {
+      await delay(400);
+      const b = BULLETINS.find(x => x.id === id);
+      if(b) {
+          b.referenceDate = date;
+          b.measurementPeriod = period;
+          b.type = type;
+      }
+  },
+
   deleteBulletin: async (id: string): Promise<void> => {
       await delay(300);
       BULLETINS = BULLETINS.filter(b => b.id !== id);
@@ -446,115 +456,96 @@ export const DataService = {
     };
   },
 
-  // Aggregation Logic (Cloud Function simulation)
+  // Aggregation Logic - NOW FOCUSED ON BULLETINS
   getDashboardMetrics: async (projectId: string): Promise<DashboardMetrics> => {
-    await delay(600); // Heavier calculation
+    await delay(600);
     
-    const relevantRDOs = RDOS.filter(r => r.projectId === projectId);
-    const relevantIndices = INDICES.filter(i => i.projectId === projectId);
+    // Get all Bulletins for Project
+    const bulletins = BULLETINS.filter(b => b.projectId === projectId);
     
-    let totalRevenue = 0;
-    let rentalRevenue = 0;
-    let constructionRevenue = 0;
-    
-    // Aggregation Maps
-    const eqRevenueMap: Record<string, number> = {};
-    const categoryRevMap: Record<string, number> = {};
-    const cityRevMap: Record<string, number> = {};
-    const segmentRevMap: Record<string, number> = {};
+    // Separate by Type
+    const rentalBulletins = bulletins.filter(b => b.type === IndexType.RENTAL);
+    const constructionBulletins = bulletins.filter(b => b.type === IndexType.CONSTRUTORA);
 
-    relevantRDOs.forEach(rdo => {
-      totalRevenue += rdo.totalDailyValue;
-      rdo.items.forEach(item => {
-        // Index Type Revenue
-        const idx = relevantIndices.find(i => i.id === item.indexId);
-        if (idx) {
-          if (idx.type === IndexType.RENTAL) {
-            rentalRevenue += item.totalValue;
-          } else {
-            constructionRevenue += item.totalValue;
-          }
-        }
+    // Helpers
+    const getSum = (items: any[], field: string) => items.reduce((acc, i) => acc + (i[field] || 0), 0);
+    const getLatest = (list: any[]) => list.sort((a,b) => new Date(b.referenceDate).getTime() - new Date(a.referenceDate).getTime())[0];
+
+    // --- SNAPSHOTS (Latest State) ---
+    // We assume the LATEST bulletin contains the most up-to-date accumulated values and contract values
+    
+    const latestRental = getLatest(rentalBulletins);
+    const latestConst = getLatest(constructionBulletins);
+
+    // Card 1: Total Contract Value (Column O)
+    const contractRental = latestRental ? getSum(latestRental.items, 'totalContractValue') : 0;
+    const contractConst = latestConst ? getSum(latestConst.items, 'totalContractValue') : 0;
+    
+    // Card 2: Total Accumulated Measured (Column N)
+    const measuredAccRental = latestRental ? getSum(latestRental.items, 'totalAccumulatedValue') : 0;
+    const measuredAccConst = latestConst ? getSum(latestConst.items, 'totalAccumulatedValue') : 0;
+
+    // Card 3: Balance (Column P)
+    // Note: Balance usually calculated as Contract - Accumulated, but we trust the excel column P 'balanceValue'
+    const balanceRental = latestRental ? getSum(latestRental.items, 'balanceValue') : 0;
+    const balanceConst = latestConst ? getSum(latestConst.items, 'balanceValue') : 0;
+
+    // Card 4: Monthly Average (Sum of Monthly values / Count of months)
+    const sumMonthlyRental = rentalBulletins.reduce((acc, b) => acc + b.totalValue, 0);
+    const sumMonthlyConst = constructionBulletins.reduce((acc, b) => acc + b.totalValue, 0);
+    
+    const avgRental = rentalBulletins.length > 0 ? sumMonthlyRental / rentalBulletins.length : 0;
+    const avgConst = constructionBulletins.length > 0 ? sumMonthlyConst / constructionBulletins.length : 0;
+
+
+    // --- EVOLUTION CHART ---
+    // We need to group bulletins by month (YYYY-MM) to create a timeline
+    const timeline: Record<string, { measured: number, balance: number, accumulated: number }> = {};
+
+    bulletins.forEach(b => {
+        const monthKey = b.referenceDate.slice(0, 7); // YYYY-MM
+        if (!timeline[monthKey]) timeline[monthKey] = { measured: 0, balance: 0, accumulated: 0 };
         
-        // Equipment Revenue
-        if (item.equipmentId) {
-          eqRevenueMap[item.equipmentId] = (eqRevenueMap[item.equipmentId] || 0) + item.totalValue;
-          
-          // Category Revenue (Derived from Equipment)
-          const eq = EQUIPMENT.find(e => e.id === item.equipmentId);
-          if (eq) {
-             categoryRevMap[eq.category] = (categoryRevMap[eq.category] || 0) + item.totalValue;
-          }
-        }
+        // Summing Monthly Measurement (Col M)
+        timeline[monthKey].measured += b.totalValue;
 
-        // City & Segment Revenue (Regardless of equipment)
-        if (item.city) {
-            cityRevMap[item.city] = (cityRevMap[item.city] || 0) + item.totalValue;
-        }
-        if (item.segment) {
-            segmentRevMap[item.segment] = (segmentRevMap[item.segment] || 0) + item.totalValue;
-        }
-      });
+        // For Balance and Accumulated, summing them is tricky because they are snapshots.
+        // However, if we have Rental + Const for the SAME month, we sum them.
+        // We iterate items to be precise.
+        
+        timeline[monthKey].accumulated += getSum(b.items, 'totalAccumulatedValue');
+        timeline[monthKey].balance += getSum(b.items, 'balanceValue');
     });
 
-    // Costs Aggregation
-    const eqCostsMap: Record<string, number> = {};
-    const categoryCostMap: Record<string, number> = {};
-    let totalCosts = 0;
-
-    COSTS.forEach(cost => {
-      // NOTE: In a real app, verify cost is related to the project/timeframe. 
-      // For now, assuming costs are global per equipment.
-      eqCostsMap[cost.equipmentId] = (eqCostsMap[cost.equipmentId] || 0) + cost.value;
-      totalCosts += cost.value;
-
-      const eq = EQUIPMENT.find(e => e.id === cost.equipmentId);
-      if (eq) {
-        categoryCostMap[eq.category] = (categoryCostMap[eq.category] || 0) + cost.value;
-      }
-    });
-
-    // Transform Maps to Arrays
-
-    // 1. Equipment Health
-    const equipmentHealth = EQUIPMENT.map(eq => ({
-      equipmentId: eq.id,
-      equipmentName: `${eq.internalCode} - ${eq.name}`,
-      category: eq.category,
-      revenue: eqRevenueMap[eq.id] || 0,
-      cost: eqCostsMap[eq.id] || 0,
-      margin: (eqRevenueMap[eq.id] || 0) - (eqCostsMap[eq.id] || 0)
-    })).sort((a, b) => b.revenue - a.revenue);
-
-    // 2. Category Metrics
-    const allCategories = Array.from(new Set([...Object.keys(categoryRevMap), ...Object.keys(categoryCostMap)]));
-
-    const categoryMetrics = allCategories.map(cat => ({
-        name: cat,
-        revenue: categoryRevMap[cat] || 0,
-        cost: categoryCostMap[cat] || 0,
-        margin: (categoryRevMap[cat] || 0) - (categoryCostMap[cat] || 0)
-    })).sort((a, b) => b.revenue - a.revenue);
-
-    // 3. City Metrics
-    const cityMetrics = Object.entries(cityRevMap).map(([name, value]) => ({
-        name, value
-    })).sort((a,b) => b.value - a.value);
-
-    // 4. Segment Metrics
-    const segmentMetrics = Object.entries(segmentRevMap).map(([name, value]) => ({
-        name, value
-    })).sort((a,b) => b.value - a.value);
+    const evolutionHistory = Object.entries(timeline).map(([month, data]) => ({
+        month,
+        measuredMonthly: data.measured,
+        balance: data.balance,
+        accumulated: data.accumulated
+    })).sort((a,b) => a.month.localeCompare(b.month));
 
     return {
-      totalRevenue,
-      rentalRevenue,
-      constructionRevenue,
-      totalCosts,
-      equipmentHealth,
-      categoryMetrics,
-      cityMetrics,
-      segmentMetrics
+      contractTotal: {
+          total: contractRental + contractConst,
+          rental: contractRental,
+          construction: contractConst
+      },
+      measuredTotal: {
+          total: measuredAccRental + measuredAccConst,
+          rental: measuredAccRental,
+          construction: measuredAccConst
+      },
+      balanceTotal: {
+          total: balanceRental + balanceConst,
+          rental: balanceRental,
+          construction: balanceConst
+      },
+      monthlyAverage: {
+          total: avgRental + avgConst,
+          rental: avgRental,
+          construction: avgConst
+      },
+      evolutionHistory
     };
   }
 };
