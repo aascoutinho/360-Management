@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Grupo DR - Portal RDO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              dr: {
+                900: '#0f172a',
+                800: '#1e293b',
+                700: '#334155',
+                600: '#475569',
+                500: '#64748b',
+                primary: '#2563eb',   // Blue
+                accent: '#f59e0b',    // Amber/Orange for Construction
+                success: '#10b981',   // Emerald for Rental
+              }
+            }
+          }
+        }
+      }
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "recharts": "https://esm.sh/recharts@^3.7.0"
+  }
+}
+</script>
+</head>
+  <body class="bg-gray-50 text-slate-900 font-sans antialiased">
+    <div id="root"></div>
+  </body>
+</html>
